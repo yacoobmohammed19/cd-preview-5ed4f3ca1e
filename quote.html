@@ -155,6 +155,21 @@ footer{border-top:1px solid rgba(164,138,110,.25);padding:36px 0 90px;font-size:
 .sum .btn{width:100%;justify-content:center;background:var(--linen);color:var(--ink);border-color:var(--linen);margin-top:6px}
 .sum .btn:hover{background:var(--oat);border-color:var(--oat)}
 .sum .note{color:#cfc3b5}
+.apts{display:grid;gap:14px;margin-bottom:26px}
+@media(min-width:700px){.apts{grid-template-columns:repeat(3,1fr)}}
+.apts button.pkg{text-align:left;border-radius:var(--r);padding:18px;display:block}
+.pkg .pn{display:block;font-family:var(--serif);font-size:24px}
+.pkg .pf{display:block;color:var(--bronze);font-weight:500;margin:2px 0 8px}
+.pkg ul{list-style:none;font-size:13px;line-height:1.45}
+.pkg li{margin-bottom:5px}
+.apts button.pkg[aria-pressed=true] .pf{color:var(--oat)}
+.szl{margin-top:6px}
+.ex.sz button small{display:block;font-size:11.5px;opacity:.75}
+.items small{color:var(--muted);font-size:12px;display:block}
+.items li.rsub{font-weight:500}
+.sum li{display:flex;justify-content:space-between;gap:10px}
+.sum ul.tots{border-top:1px solid rgba(217,200,176,.25);margin-top:14px;padding-top:8px}
+.disc{font-size:13px;color:var(--muted);background:#fff6e0;border:1px dashed #c9a96a;border-radius:12px;padding:10px 14px;margin-bottom:22px}
 .addk{margin-top:4px}
 
 </style>
@@ -180,15 +195,16 @@ footer{border-top:1px solid rgba(164,138,110,.25);padding:36px 0 90px;font-size:
   <div class="wrap">
     <div class="sec-head">
       <span class="eyebrow">Quote builder</span>
-      <h2>Build your estate special quote.</h2>
-      <p>Choose your apartment, then pick the room type and curtains or blinds for each room. Your selection builds up on the right. <span class="ph">[Prices and materials to be confirmed]</span></p>
+      <h2>Choose a package, then build your quote.</h2>
+      <p>Pick the package for your apartment size, then set the room type, curtains or blinds and window size for each room. Your quote builds up on the right.</p>
     </div>
   </div>
 </section>
 <section style="padding-top:0">
   <div class="wrap q-grid">
     <div>
-      <label>Apartment type</label>
+      <p class="disc">All prices and materials are indicative estimates in rand, VAT inclusive, pending final measurement and confirmation. Packages include a 10% discount versus buying the items separately.</p>
+      <label>Choose your package</label>
       <div class="apts" id="apts"></div>
       <div id="rooms"></div>
       <button class="btn btn-ghost addk" id="addk" type="button">+ Add a kitchen</button>
@@ -197,11 +213,11 @@ footer{border-top:1px solid rgba(164,138,110,.25);padding:36px 0 90px;font-size:
       <h2>Your quote</h2>
       <p class="sub" id="sumSub"></p>
       <div id="sumBody"></div>
-      <div class="tot">Total: <span class="ph">[to be confirmed]</span></div>
+      <div class="tot">Estimated total (incl. VAT): <span id="tot"></span></div>
       <input id="qname" placeholder="Your name" autocomplete="name" aria-label="Your name">
       <input id="qunit" placeholder="Unit / house number" aria-label="Unit or house number">
       <button class="btn" id="req" type="button">Request this quote on WhatsApp</button>
-      <p class="note">Opens WhatsApp with your selection filled in. Nothing is sent until you press send.</p>
+      <p class="note">Indicative estimate only, subject to final measurement and confirmation. Opens WhatsApp with your selection filled in. Nothing is sent until you press send.</p>
       <div id="notice" role="status">The Coco Decor WhatsApp number is still being added. Please check back soon.</div>
     </aside>
   </div>
@@ -215,105 +231,163 @@ footer{border-top:1px solid rgba(164,138,110,.25);padding:36px 0 90px;font-size:
   </div>
 </footer>
 <script>
-// Placeholder: add the Coco Decor WhatsApp number (international format, digits only) to activate the request button.
+// ===== EASY-EDIT DATA BLOCK (all figures are indicative placeholder estimates in rand, VAT inclusive) =====
+// Add the Coco Decor WhatsApp number (international format, digits only) to activate the request button.
 const WA_NUMBER = "";
+const VAT_RATE = 0.15;            // prices below already include VAT
+const PACKAGE_DISCOUNT = 0.10;    // 10% off the item total when ordered as a package
 
-// PIECE CATALOGUE: fill in material and price here later (price: number, material: text). null = still to be confirmed.
+// Window sizes (width of the window or door). types = room types the size is offered for.
+const SIZES = [
+  { id: "S",  label: "Small",       range: "up to 1.2 m wide",      types: ["en-suite", "standard", "lounge", "kitchen"] },
+  { id: "M",  label: "Standard",    range: "1.2 to 2.0 m",          types: ["en-suite", "standard", "lounge", "kitchen"] },
+  { id: "L",  label: "Large",       range: "2.0 to 3.0 m",          types: ["standard", "lounge", "kitchen"] },
+  { id: "XL", label: "Extra large", range: "3.0 m+ / sliding door", types: ["lounge"] }
+];
+
+// Price list: rand per unit, by window size. material = placeholder description.
 const PIECES = {
-  bathroomBlind: { name: "Bathroom blind",     material: null, price: null },
-  lining:        { name: "Lining",             material: null, price: null },
-  blackout:      { name: "Black out curtains", material: null, price: null },
-  holder:        { name: "Curtain holder",     material: null, price: null },
-  railing:       { name: "Railing",            material: null, price: null },
-  blind:         { name: "Blind",              material: null, price: null }
+  bathroomBlind: { name: "Bathroom blind",     material: "Moisture-resistant roller blind",        price: { S: 450,  M: 650,  L: 850,  XL: 1100 } },
+  lining:        { name: "Lining",             material: "Standard cotton-poly curtain lining",    price: { S: 450,  M: 650,  L: 900,  XL: 1250 } },
+  blackout:      { name: "Black out curtains", material: "Made-to-measure triple-weave blackout",  price: { S: 1350, M: 1950, L: 2750, XL: 3800 } },
+  holder:        { name: "Curtain holder",     material: "Tie-back / holder pair",                 price: { S: 180,  M: 180,  L: 220,  XL: 260 } },
+  railing:       { name: "Railing",            material: "Aluminium curtain rail with brackets",   price: { S: 280,  M: 420,  L: 620,  XL: 880 } },
+  blind:         { name: "Blind",              material: "Roller blockout blind, made to measure", price: { S: 650,  M: 950,  L: 1450, XL: 2100 } }
 };
 // Pieces and quantities that make up a curtain set.
 const CURTAIN_SET = [["lining", 1], ["blackout", 1], ["holder", 1], ["railing", 2]];
 
-// Apartment layouts as listed. blinds = quantity for the "or blinds" alternative (null = quantity to be confirmed).
+// Packages and their base room lists. blinds = quantity of blinds when the room takes blinds instead of curtains.
 const APARTMENTS = {
   "1 bedroom": [
-    { name: "Bedroom 1", type: "en-suite", blinds: null },
-    { name: "Lounge",    type: "lounge",   blinds: null }
+    { name: "Bedroom", type: "en-suite", blinds: 2 },
+    { name: "Lounge",  type: "lounge",   blinds: 2 }
   ],
   "2 bedroom": [
-    { name: "Bedroom 1", type: "en-suite", blinds: null },
+    { name: "Bedroom 1", type: "en-suite", blinds: 2 },
     { name: "Bedroom 2", type: "en-suite", blinds: 2 },
-    { name: "Lounge",    type: "lounge",   blinds: null }
+    { name: "Lounge",    type: "lounge",   blinds: 2 }
   ],
   "3 bedroom": [
-    { name: "Room 1 en-suite", type: "en-suite", blinds: null },
-    { name: "Room 1",          type: "standard", blinds: null },
-    { name: "Lounge",          type: "lounge",   blinds: null },
+    { name: "Room 1 en-suite", type: "en-suite", blinds: 2 },
+    { name: "Room 1",          type: "standard", blinds: 2 },
+    { name: "Lounge",          type: "lounge",   blinds: 2 },
     { name: "Room 2",          type: "standard", blinds: 2 },
     { name: "Room 3",          type: "standard", blinds: 2 }
   ]
 };
-const TYPES = [["en-suite", "En-suite"], ["standard", "Standard"], ["lounge", "Lounge"], ["kitchen", "Kitchen"]];
+const TYPES = [["en-suite", "En-suite"], ["standard", "Standard bedroom"], ["lounge", "Lounge"], ["kitchen", "Kitchen"]];
+// ===== END DATA BLOCK =====
+
+//CALC-START
+const fmt = n => "R" + String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
+function sizesFor(type) { return SIZES.filter(s => s.types.includes(type)); }
+function fixSize(r) { if (!sizesFor(r.type).some(s => s.id === r.size)) r.size = sizesFor(r.type)[0].id; }
+// Items for one room given its type, curtains/blinds choice and window size.
+function itemsFor(r) {
+  const out = [];
+  if (r.type === "en-suite") out.push({ id: "bathroomBlind", qty: 1 });
+  if (r.type === "kitchen") out.push({ id: "blind", qty: 1 });
+  else if (r.choice === "blinds") out.push({ id: "blind", qty: r.blinds });
+  else CURTAIN_SET.forEach(([id, qty]) => out.push({ id, qty }));
+  return out.map(i => {
+    const p = PIECES[i.id], unit = p.price[r.size];
+    return { ...i, label: i.qty + " x " + p.name, unit, total: unit * i.qty };
+  });
+}
+function roomTotal(r) { return itemsFor(r).reduce((s, i) => s + i.total, 0); }
+function quoteTotals(rooms) {
+  const subtotal = rooms.reduce((s, r) => s + roomTotal(r), 0);
+  const discount = Math.round(subtotal * PACKAGE_DISCOUNT);
+  const total = subtotal - discount;
+  return { subtotal, discount, total, vat: Math.round(total * VAT_RATE / (1 + VAT_RATE)) };
+}
+function newRoom(r) { const x = { ...r, choice: "curtains", size: "M", custom: false }; fixSize(x); return x; }
+// "From" price: every room at its smallest size, cheapest of curtains/blinds, after discount.
+function packageFrom(a) {
+  const rs = APARTMENTS[a].map(r => {
+    const x = newRoom(r); x.size = sizesFor(x.type)[0].id;
+    const c = { ...x, choice: "curtains" }, b = { ...x, choice: "blinds" };
+    return roomTotal(b) < roomTotal(c) ? b : c;
+  });
+  return quoteTotals(rs).total;
+}
+//CALC-END
 
 let apt = "1 bedroom", rooms = [];
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const tbc = '<span class="ph">[price/material tbc]</span>';
+const typeLabel = t => TYPES.find(x => x[0] === t)[1];
+const sizeLabel = r => sizesFor(r.type).find(s => s.id === r.size).label;
 
 function load(a) {
   apt = a;
-  rooms = APARTMENTS[a].map(r => ({ ...r, choice: "curtains", custom: false }));
+  rooms = APARTMENTS[a].map(newRoom);
   render();
 }
 
-// Items for one room given its type and choice.
-function itemsFor(r) {
-  const out = [];
-  if (r.type === "en-suite") out.push({ id: "bathroomBlind", qty: 1 });
-  if (r.type === "kitchen" || r.choice === "blinds") out.push({ id: "blind", qty: r.blinds, label: r.blinds ? r.blinds + " x Blinds" : "Blinds (quantity to be confirmed)" });
-  else CURTAIN_SET.forEach(([id, qty]) => out.push({ id, qty }));
-  return out.map(i => ({ ...i, label: i.label || (i.qty + " x " + PIECES[i.id].name), piece: PIECES[i.id] }));
-}
-
-function priceTxt(i) { return i.piece.price == null ? tbc : "R" + i.piece.price; }
-
 function render() {
-  $("apts").innerHTML = Object.keys(APARTMENTS).map(a => '<button type="button" data-a="' + a + '" aria-pressed="' + (a === apt) + '">' + a + " apartment</button>").join("");
+  $("apts").innerHTML = Object.keys(APARTMENTS).map(a => {
+    const list = APARTMENTS[a].map(r => "<li><b>" + esc(r.name) + "</b>: " + (r.type === "en-suite" ? "1 x bathroom blind, " : "") + "1 x lining, 1 x black out curtains, 1 x curtain holder, 2 x railings, or " + r.blinds + " x blinds</li>").join("");
+    return '<button type="button" class="pkg" data-a="' + a + '" aria-pressed="' + (a === apt) + '"><span class="pn">' + a + ' package</span><span class="pf">From ' + fmt(packageFrom(a)) + ' incl. VAT</span><ul>' + list + "</ul></button>";
+  }).join("");
   $("rooms").innerHTML = rooms.map((r, n) => {
     const kitchen = r.type === "kitchen";
     const opts = TYPES.map(t => '<option value="' + t[0] + '"' + (t[0] === r.type ? " selected" : "") + ">" + t[1] + "</option>").join("");
+    const sz = sizesFor(r.type).map(s => '<button type="button" data-n="' + n + '" data-s="' + s.id + '" aria-pressed="' + (r.size === s.id) + '">' + s.label + "<small>" + s.range + "</small></button>").join("");
     const choice = kitchen
       ? '<p class="only">Kitchens are blinds only.</p>'
       : '<div class="ex"><button type="button" data-n="' + n + '" data-c="curtains" aria-pressed="' + (r.choice === "curtains") + '">Curtains</button><button type="button" data-n="' + n + '" data-c="blinds" aria-pressed="' + (r.choice === "blinds") + '">Blinds</button></div>';
     return '<div class="room"><div class="room-top"><h3>' + esc(r.name) + '</h3><span><select data-n="' + n + '" aria-label="Room type for ' + esc(r.name) + '">' + opts + "</select>" +
       (r.custom ? ' <button class="rm" type="button" data-rm="' + n + '">Remove</button>' : "") + "</span></div>" + choice +
-      '<ul class="items">' + itemsFor(r).map(i => "<li><span>" + esc(i.label) + "</span>" + priceTxt(i) + "</li>").join("") + "</ul></div>";
+      '<label class="szl">Window size</label><div class="ex sz">' + sz + "</div>" +
+      '<ul class="items">' + itemsFor(r).map(i => "<li><span>" + esc(i.label) + " <small>" + esc(PIECES[i.id].material) + "</small></span><span>" + fmt(i.total) + "</span></li>").join("") +
+      '<li class="rsub"><span>Room subtotal</span><span>' + fmt(roomTotal(r)) + "</span></li></ul></div>";
   }).join("");
-  $("sumSub").textContent = apt + " apartment";
-  $("sumBody").innerHTML = rooms.map(r => "<h4>" + esc(r.name) + " (" + TYPES.find(t => t[0] === r.type)[1] + ")</h4><ul>" +
-    itemsFor(r).map(i => "<li>" + esc(i.label) + " " + tbc + "</li>").join("") + "</ul>").join("");
+  const t = quoteTotals(rooms);
+  $("sumSub").textContent = apt + " package";
+  $("sumBody").innerHTML = rooms.map(r => "<h4>" + esc(r.name) + " (" + typeLabel(r.type) + ", " + sizeLabel(r) + ")</h4><ul>" +
+    itemsFor(r).map(i => "<li><span>" + esc(i.label) + "</span><span>" + fmt(i.total) + "</span></li>").join("") +
+    '<li class="rsub"><span>Room subtotal</span><span>' + fmt(roomTotal(r)) + "</span></li></ul>").join("") +
+    '<ul class="tots"><li><span>Items subtotal</span><span>' + fmt(t.subtotal) + "</span></li>" +
+    "<li><span>Package discount (" + Math.round(PACKAGE_DISCOUNT * 100) + "%)</span><span>-" + fmt(t.discount) + "</span></li>" +
+    "<li><span>of which VAT (15%)</span><span>" + fmt(t.vat) + "</span></li></ul>";
+  $("tot").textContent = fmt(t.total);
 }
 
 document.addEventListener("click", e => {
-  const t = e.target;
-  if (t.dataset.a) load(t.dataset.a);
-  else if (t.dataset.c) { rooms[t.dataset.n].choice = t.dataset.c; render(); }
-  else if (t.dataset.rm) { rooms.splice(+t.dataset.rm, 1); render(); }
+  const b = e.target.closest("button");
+  if (!b) return;
+  if (b.dataset.a) load(b.dataset.a);
+  else if (b.dataset.c) { rooms[b.dataset.n].choice = b.dataset.c; render(); }
+  else if (b.dataset.s) { rooms[b.dataset.n].size = b.dataset.s; render(); }
+  else if (b.dataset.rm) { rooms.splice(+b.dataset.rm, 1); render(); }
 });
 document.addEventListener("change", e => {
   if (e.target.tagName !== "SELECT") return;
   const r = rooms[e.target.dataset.n];
   r.type = e.target.value;
   if (r.type === "kitchen") r.choice = "blinds";
+  fixSize(r);
   render();
 });
 $("addk").addEventListener("click", () => {
-  rooms.push({ name: "Kitchen", type: "kitchen", blinds: null, choice: "blinds", custom: true });
+  const k = newRoom({ name: "Kitchen", type: "kitchen", blinds: 1 });
+  k.choice = "blinds"; k.custom = true;
+  rooms.push(k);
   render();
 });
 $("req").addEventListener("click", () => {
-  const lines = ["Hi Coco Decor, I would like a quote for the Estate Move-In Special.", "Apartment: " + apt,
+  const t = quoteTotals(rooms);
+  const lines = ["Hi Coco Decor, I would like a quote for the " + apt + " package.",
     "Name: " + ($("qname").value || "-"), "Unit: " + ($("qunit").value || "-"), ""];
   rooms.forEach(r => {
-    lines.push(r.name + " (" + TYPES.find(t => t[0] === r.type)[1] + "):");
-    itemsFor(r).forEach(i => lines.push("- " + i.label));
+    lines.push(r.name + " (" + typeLabel(r.type) + ", " + sizeLabel(r) + " window):");
+    itemsFor(r).forEach(i => lines.push("- " + i.label + ": " + fmt(i.total)));
+    lines.push("Room subtotal: " + fmt(roomTotal(r)));
   });
+  lines.push("", "Items subtotal: " + fmt(t.subtotal), "Package discount: -" + fmt(t.discount), "Estimated total incl. VAT: " + fmt(t.total),
+    "(Indicative estimate, subject to final measurement and confirmation.)");
   if (!WA_NUMBER) { $("notice").style.display = "block"; return; }
   window.open("https://wa.me/" + WA_NUMBER + "?text=" + encodeURIComponent(lines.join("\n")), "_blank", "noopener");
 });
